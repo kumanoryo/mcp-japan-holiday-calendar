@@ -10,9 +10,23 @@ mcp = FastMCP("japanese-holiday")
 # Constants
 DATA_FILE_PATH = "data/calendar_holiday.json"
 
+# Global cache for holiday data
+_holiday_data_cache: Optional[list[dict[str, Any]]] = None
+
 def load_holiday_data() -> list[dict[str, Any]]:
-    """Load holiday data from JSON file."""
-    file_path = os.path.join(os.path.dirname(__file__), DATA_FILE_PATH)
+    """Load holiday data from JSON file with caching."""
+    global _holiday_data_cache
+    
+    # Return cached data if available
+    if _holiday_data_cache is not None:
+        return _holiday_data_cache
+    
+    # Load data from file
+    # Try Docker path first, then local development path
+    docker_path = DATA_FILE_PATH
+    local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), DATA_FILE_PATH)
+    
+    file_path = docker_path if os.path.exists(docker_path) else local_path
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             data = []
@@ -20,6 +34,9 @@ def load_holiday_data() -> list[dict[str, Any]]:
                 line = line.strip()
                 if line:
                     data.append(json.loads(line))
+            # Cache the data
+            _holiday_data_cache = data
+            print(f"Loaded {len(data)} holiday records into cache")
             return data
     except Exception as e:
         print(f"Error loading holiday data: {e}")
