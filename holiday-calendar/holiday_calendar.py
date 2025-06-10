@@ -12,10 +12,12 @@ DATA_FILE_PATH = "data/calendar_holiday.json"
 
 # Global cache for holiday data
 _holiday_data_cache: Optional[list[dict[str, Any]]] = None
+_date_index_cache: Optional[dict[str, dict[str, Any]]] = None
+_month_index_cache: Optional[dict[str, list[dict[str, Any]]]] = None
 
 def load_holiday_data() -> list[dict[str, Any]]:
     """Load holiday data from JSON file with caching."""
-    global _holiday_data_cache
+    global _holiday_data_cache, _date_index_cache, _month_index_cache
     
     # Return cached data if available
     if _holiday_data_cache is not None:
@@ -34,16 +36,55 @@ def load_holiday_data() -> list[dict[str, Any]]:
                 line = line.strip()
                 if line:
                     data.append(json.loads(line))
+            
             # Cache the data
             _holiday_data_cache = data
-            print(f"Loaded {len(data)} holiday records into cache")
+            
+            # Build optimized indexes
+            _build_indexes(data)
+            
+            print(f"Loaded {len(data)} holiday records with optimized indexes")
             return data
     except Exception as e:
         print(f"Error loading holiday data: {e}")
         return []
 
-def find_date_info(target_date: str, data: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
-    """Find information for a specific date."""
+def _build_indexes(data: list[dict[str, Any]]) -> None:
+    """Build optimized indexes for fast lookups."""
+    global _date_index_cache, _month_index_cache
+    
+    # Build date index: date -> record (O(1) lookup)
+    _date_index_cache = {}
+    for item in data:
+        date_str = item.get('date')
+        if date_str:
+            _date_index_cache[date_str] = item
+    
+    # Build month index: "YYYY-MM" -> [records] (O(k) lookup where k = days in month)
+    _month_index_cache = {}
+    for item in data:
+        date_str = item.get('date')
+        if date_str and len(date_str) >= 7:  # YYYY-MM-DD format
+            month_key = date_str[:7]  # YYYY-MM
+            if month_key not in _month_index_cache:
+                _month_index_cache[month_key] = []
+            _month_index_cache[month_key].append(item)
+    
+    print(f"Built date index: {len(_date_index_cache)} entries")
+    print(f"Built month index: {len(_month_index_cache)} months")
+
+def find_date_info(target_date: str, data: list[dict[str, Any]] = None) -> Optional[dict[str, Any]]:
+    """Find information for a specific date using optimized index."""
+    global _date_index_cache
+    
+    # Use optimized index if available
+    if _date_index_cache is not None:
+        return _date_index_cache.get(target_date)
+    
+    # Fallback to linear search (for backward compatibility)
+    if data is None:
+        data = load_holiday_data()
+    
     for item in data:
         if item.get('date') == target_date:
             return item
@@ -103,7 +144,7 @@ async def get_holiday_info(target_date: str) -> str:
     if not data:
         return "休日データの読み込みに失敗しました。"
     
-    date_info = find_date_info(target_date, data)
+    date_info = find_date_info(target_date)
     if not date_info:
         return f"{target_date}の情報が見つかりませんでした。"
     
@@ -111,7 +152,7 @@ async def get_holiday_info(target_date: str) -> str:
 
 @mcp.tool()
 async def get_holidays_in_month(year: int, month: int) -> str:
-    """Get all holidays in a specific month.
+    """Get all holidays in a specific month using optimized index.
 
     Args:
         year: Year (e.g. 2025)
@@ -120,21 +161,39 @@ async def get_holidays_in_month(year: int, month: int) -> str:
     if not (1 <= month <= 12):
         return "月は1から12の間で指定してください。"
     
+    global _month_index_cache
+    
+    # Ensure data is loaded
     data = load_holiday_data()
     if not data:
         return "休日データの読み込みに失敗しました。"
     
+    month_key = f"{year}-{month:02d}"
     holidays = []
-    for item in data:
-        date_obj = item.get('date', '')
-        if date_obj.startswith(f"{year}-{month:02d}"):
+    
+    # Use optimized month index if available
+    if _month_index_cache is not None:
+        month_data = _month_index_cache.get(month_key, [])
+        for item in month_data:
             public_holiday = item.get('public_holiday', {})
             if public_holiday.get('flag'):
                 holidays.append({
-                    'date': date_obj,
+                    'date': item.get('date', ''),
                     'name': public_holiday.get('name', ''),
                     'dayofweek': item.get('dayofweek', {}).get('name', '')
                 })
+    else:
+        # Fallback to linear search
+        for item in data:
+            date_obj = item.get('date', '')
+            if date_obj.startswith(month_key):
+                public_holiday = item.get('public_holiday', {})
+                if public_holiday.get('flag'):
+                    holidays.append({
+                        'date': date_obj,
+                        'name': public_holiday.get('name', ''),
+                        'dayofweek': item.get('dayofweek', {}).get('name', '')
+                    })
     
     if not holidays:
         return f"{year}年{month}月には祝日がありません。"
@@ -176,7 +235,7 @@ async def get_next_holiday() -> str:
 
 @mcp.tool()
 async def get_business_days_count(year: int, month: int) -> str:
-    """Get business days count for a specific month.
+    """Get business days count for a specific month using optimized index.
 
     Args:
         year: Year (e.g. 2025)
@@ -185,20 +244,34 @@ async def get_business_days_count(year: int, month: int) -> str:
     if not (1 <= month <= 12):
         return "月は1から12の間で指定してください。"
     
+    global _month_index_cache
+    
+    # Ensure data is loaded
     data = load_holiday_data()
     if not data:
         return "休日データの読み込みに失敗しました。"
     
+    month_key = f"{year}-{month:02d}"
     business_days = 0
     total_days = 0
     
-    for item in data:
-        date_obj = item.get('date', '')
-        if date_obj.startswith(f"{year}-{month:02d}"):
+    # Use optimized month index if available
+    if _month_index_cache is not None:
+        month_data = _month_index_cache.get(month_key, [])
+        for item in month_data:
             total_days += 1
             bank_holiday = item.get('bank_holiday', {})
             if not bank_holiday.get('flag'):
                 business_days += 1
+    else:
+        # Fallback to linear search
+        for item in data:
+            date_obj = item.get('date', '')
+            if date_obj.startswith(month_key):
+                total_days += 1
+                bank_holiday = item.get('bank_holiday', {})
+                if not bank_holiday.get('flag'):
+                    business_days += 1
     
     if total_days == 0:
         return f"{year}年{month}月のデータが見つかりませんでした。"
