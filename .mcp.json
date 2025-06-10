@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mcp-japan-holiday-calendar": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "mcp-japan-holiday"]
+    }
+  }
+}
