@@ -8,7 +8,7 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("japanese-holiday")
 
 # Constants
-DATA_FILE_PATH = "../data/calendar_holiday.json"
+DATA_FILE_PATH = "data/calendar_holiday.json"
 
 def load_holiday_data() -> list[dict[str, Any]]:
     """Load holiday data from JSON file."""
@@ -127,6 +127,35 @@ async def get_holidays_in_month(year: int, month: int) -> str:
         result += f"• {holiday['date']} ({holiday['dayofweek']}曜日): {holiday['name']}\n"
     
     return result
+
+@mcp.tool()
+async def get_next_holiday() -> str:
+    """Get the next upcoming holiday from today."""
+    data = load_holiday_data()
+    if not data:
+        return "休日データの読み込みに失敗しました。"
+    
+    today = date.today()
+    today_str = today.strftime('%Y-%m-%d')
+    
+    next_holidays = []
+    for item in data:
+        date_str = item.get('date', '')
+        if date_str >= today_str:
+            public_holiday = item.get('public_holiday', {})
+            if public_holiday.get('flag'):
+                next_holidays.append({
+                    'date': date_str,
+                    'name': public_holiday.get('name', ''),
+                    'dayofweek': item.get('dayofweek', {}).get('name', '')
+                })
+                break
+    
+    if not next_holidays:
+        return "次の祝日が見つかりませんでした。"
+    
+    holiday = next_holidays[0]
+    return f"次の祝日: {holiday['date']} ({holiday['dayofweek']}曜日) - {holiday['name']}"
 
 @mcp.tool()
 async def get_business_days_count(year: int, month: int) -> str:

@@ -1,6 +1,8 @@
-def main():
-    print("Hello from Japanese Holiday Calendar!")
+from holiday_calendar import mcp
 
+def main():
+    # Run the MCP server
+    mcp.run(transport='stdio')
 
 if __name__ == "__main__":
     main()

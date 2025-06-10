@@ -8,13 +8,9 @@
 Claude Code CLIで以下のコマンドを実行：
 
 ```bash
-claude mcp add-json '{
-  "mcpServers": {
-    "mcp-japan-holiday-calendar": {
-      "command": "docker",
-      "args": ["run", "--rm", "-i", "ghcr.io/kumanoryo/mcp-japan-holiday-calendar:latest"]
-    }
-  }
+claude mcp add-json mcp-japan-holiday-calendar '{
+  "command": "docker",
+  "args": ["run", "--rm", "-i", "ghcr.io/kumanoryo/mcp-japan-holiday-calendar:latest"]
 }'
 ```
 
@@ -22,14 +18,10 @@ claude mcp add-json '{
 Claude Code CLIで以下のコマンドを実行：
 
 ```bash
-claude mcp add-json '{
-  "mcpServers": {
-    "mcp-japan-holiday-calendar": {
-      "command": "python",
-      "args": ["-m", "holiday-calendar.main"],
-      "cwd": "/path/to/mcp-japan-holiday-calendar"
-    }
-  }
+claude mcp add-json mcp-japan-holiday-calendar '{
+  "command": "python",
+  "args": ["-m", "holiday-calendar.main"],
+  "cwd": "/path/to/mcp-japan-holiday-calendar"
 }'
 ```
 
