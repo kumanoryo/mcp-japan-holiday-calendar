@@ -1,0 +1,121 @@
+name: Scheduled Base Image Update Check
+
+on:
+  schedule:
+    # 毎日 23:00 UTC (日本時間 8:00 AM) に実行
+    - cron: '0 23 * * *'
+  workflow_dispatch: # 手動実行も可能
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: kumanoryo/mcp-japan-holiday-calendar
+
+jobs:
+  check-base-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      should-rebuild: ${{ steps.check.outputs.should-rebuild }}
+      
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Check if base image has been updated
+      id: check
+      run: |
+        # ベースイメージの最新ダイジェストを取得
+        BASE_DIGEST=$(docker buildx imagetools inspect python:3.11-slim --format '{{.Manifest.Digest}}')
+        echo "Current base image digest: $BASE_DIGEST"
+        
+        # 既存のイメージが存在するかチェック
+        if docker buildx imagetools inspect $REGISTRY/$IMAGE_NAME:latest >/dev/null 2>&1; then
+          # 既存イメージのベースイメージダイジェストを取得（簡易的なチェック）
+          EXISTING_DIGEST=$(docker buildx imagetools inspect $REGISTRY/$IMAGE_NAME:latest --format '{{.Manifest.Digest}}')
+          echo "Existing image digest: $EXISTING_DIGEST"
+          
+          # 24時間以内にビルドされたかチェック
+          LAST_BUILD=$(docker buildx imagetools inspect $REGISTRY/$IMAGE_NAME:latest --format '{{.Manifest.Created}}')
+          LAST_BUILD_TIMESTAMP=$(date -d "$LAST_BUILD" +%s)
+          CURRENT_TIMESTAMP=$(date +%s)
+          TIME_DIFF=$((CURRENT_TIMESTAMP - LAST_BUILD_TIMESTAMP))
+          HOURS_DIFF=$((TIME_DIFF / 3600))
+          
+          echo "Hours since last build: $HOURS_DIFF"
+          
+          # 24時間以上経過している場合はリビルド
+          if [ $HOURS_DIFF -gt 24 ]; then
+            echo "should-rebuild=true" >> $GITHUB_OUTPUT
+            echo "Rebuild needed: More than 24 hours since last build"
+          else
+            echo "should-rebuild=false" >> $GITHUB_OUTPUT
+            echo "No rebuild needed: Less than 24 hours since last build"
+          fi
+        else
+          echo "should-rebuild=true" >> $GITHUB_OUTPUT
+          echo "Rebuild needed: No existing image found"
+        fi
+
+  rebuild-if-needed:
+    needs: check-base-image
+    if: needs.check-base-image.outputs.should-rebuild == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=raw,value=latest
+          type=sha,prefix=scheduled-,suffix=-{{date 'YYYYMMDD-HHmmss'}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        # 強制的にベースイメージを最新に更新
+        no-cache: true
+    
+    - name: Create commit for scheduled rebuild
+      run: |
+        echo "Scheduled rebuild completed at $(date)" >> .rebuild-log
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .rebuild-log
+        git commit -m "Scheduled rebuild - base image updated $(date)" || exit 0
