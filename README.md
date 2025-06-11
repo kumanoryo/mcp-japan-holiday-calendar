@@ -111,3 +111,35 @@ Claude Codeで以下のような質問ができます：
 - **超高速検索**: 辞書インデックスによりO(1)検索を実現
 - **大容量データ**: 26,298件の休日データを瞬時に検索
 - **メモリ効率**: 起動時にデータをキャッシュして高速レスポンス
+
+## CI/CD・自動化
+
+### GitHub Actions
+- **自動ビルド**: pushごとにDocker imageを自動ビルド・push
+- **スケジュール更新**: 毎日8:00AM（JST）にベースイメージ更新チェック
+- **マルチプラットフォーム**: linux/amd64, linux/arm64対応
+
+### 最新のDocker Image
+```bash
+docker pull ghcr.io/kumanoryo/mcp-japan-holiday-calendar:latest
+```
+
+## トラブルシューティング
+
+### GitHub Actions エラー
+**症状**: スケジュールワークフローで「Check if base image has been updated」がエラー  
+**解決済み**: 2025-06-11に修正済み。複雑な日時解析を削除して安全な24時間経過チェックに変更。
+
+### MCPサーバー接続エラー
+**症状**: Claude CodeでMCPサーバーが認識されない  
+**解決策**: 
+1. `.mcp.json`があることを確認
+2. `claude mcp reset-project-choices`を実行
+3. Claude Codeを再起動
+
+### Dockerビルドエラー
+**症状**: ローカルでDockerビルドが失敗  
+**解決策**: 
+1. Dockerが起動していることを確認
+2. `docker system prune`でキャッシュをクリア
+3. 最新のベースイメージを取得: `docker pull python:3.11-slim`
