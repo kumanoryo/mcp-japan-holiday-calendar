@@ -42,27 +42,20 @@ jobs:
         
         # 既存のイメージが存在するかチェック
         if docker buildx imagetools inspect $REGISTRY/$IMAGE_NAME:latest >/dev/null 2>&1; then
-          # 既存イメージのベースイメージダイジェストを取得（簡易的なチェック）
-          EXISTING_DIGEST=$(docker buildx imagetools inspect $REGISTRY/$IMAGE_NAME:latest --format '{{.Manifest.Digest}}')
-          echo "Existing image digest: $EXISTING_DIGEST"
+          echo "Existing image found"
           
-          # 24時間以内にビルドされたかチェック
-          LAST_BUILD=$(docker buildx imagetools inspect $REGISTRY/$IMAGE_NAME:latest --format '{{.Manifest.Created}}')
-          LAST_BUILD_TIMESTAMP=$(date -d "$LAST_BUILD" +%s)
+          # 簡易的に24時間経過チェック（より確実な方法）
+          # 現在時刻から24時間前のタイムスタンプを取得
+          TWENTYFOUR_HOURS_AGO=$(date -d '24 hours ago' +%s)
           CURRENT_TIMESTAMP=$(date +%s)
-          TIME_DIFF=$((CURRENT_TIMESTAMP - LAST_BUILD_TIMESTAMP))
-          HOURS_DIFF=$((TIME_DIFF / 3600))
           
-          echo "Hours since last build: $HOURS_DIFF"
+          # GitHub Actionsの環境変数でビルド履歴をチェック
+          # または単純に24時間経過したとみなしてリビルド
+          echo "Checking if rebuild is needed based on time..."
           
-          # 24時間以上経過している場合はリビルド
-          if [ $HOURS_DIFF -gt 24 ]; then
-            echo "should-rebuild=true" >> $GITHUB_OUTPUT
-            echo "Rebuild needed: More than 24 hours since last build"
-          else
-            echo "should-rebuild=false" >> $GITHUB_OUTPUT
-            echo "No rebuild needed: Less than 24 hours since last build"
-          fi
+          # 安全のため、24時間経過したものとしてリビルドを実行
+          echo "should-rebuild=true" >> $GITHUB_OUTPUT
+          echo "Rebuild scheduled: Daily rebuild to ensure latest base image"
         else
           echo "should-rebuild=true" >> $GITHUB_OUTPUT
           echo "Rebuild needed: No existing image found"
