@@ -124,22 +124,14 @@ Claude Codeで以下のような質問ができます：
 docker pull ghcr.io/kumanoryo/mcp-japan-holiday-calendar:latest
 ```
 
-## トラブルシューティング
+## サポート・トラブルシューティング
 
-### GitHub Actions エラー
-**症状**: スケジュールワークフローで「Check if base image has been updated」がエラー  
-**解決済み**: 2025-06-11に修正済み。複雑な日時解析を削除して安全な24時間経過チェックに変更。
+問題が発生した場合は、[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)を参照してください。
 
-### MCPサーバー接続エラー
-**症状**: Claude CodeでMCPサーバーが認識されない  
-**解決策**: 
-1. `.mcp.json`があることを確認
-2. `claude mcp reset-project-choices`を実行
-3. Claude Codeを再起動
+よくある問題:
+- GitHub Actionsスケジュールエラー（解決済み）
+- MCPサーバー接続問題  
+- Dockerビルド・実行エラー
+- データファイル読み込み問題
 
-### Dockerビルドエラー
-**症状**: ローカルでDockerビルドが失敗  
-**解決策**: 
-1. Dockerが起動していることを確認
-2. `docker system prune`でキャッシュをクリア
-3. 最新のベースイメージを取得: `docker pull python:3.11-slim`
+[Issues](https://github.com/kumanoryo/mcp-japan-holiday-calendar/issues)での報告も受け付けています。
