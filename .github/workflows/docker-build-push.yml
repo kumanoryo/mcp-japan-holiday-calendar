@@ -6,9 +6,21 @@ on:
       - main
     tags:
       - 'v*'
+    paths-ignore:
+      - '**.md'
+      - '.mcp.json'
+      - 'tests/**'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - '.mcp.json'
+      - 'tests/**'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch: # 手動実行を可能にする
 
 env:
