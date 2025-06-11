@@ -150,3 +150,7 @@ gh run view [run_id] --log-failed
 1. [GitHub Issues](https://github.com/kumanoryo/mcp-japan-holiday-calendar/issues)で報告
 2. エラーログと実行環境を含めて報告
 3. 再現手順を明記
+
+---
+
+*最終更新: 2025-06-11*
